@@ -164,7 +164,7 @@ fn main() {
 
     let mut buffer: PixBuf = [0; WIDTH * HEIGHT];
     let mut screen: CharBuf = [32; C_WIDTH * C_HEIGHT];
-    let mut colors: ColorBuf = [0b0000_0100; C_WIDTH * C_HEIGHT];
+    let colors: ColorBuf = [0b0000_0100; C_WIDTH * C_HEIGHT];
 
     let mut cursor = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {

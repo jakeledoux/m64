@@ -1,0 +1,23 @@
+; count to 20 and log (using registers)
+mov xc, 0b0000000000000000000000000 ; so many zeroes!
+mov xa, 0x01
+
+reg_loop:
+	add xc, xa
+	cmp xc, 20
+	jlt reg_loop
+
+log xc
+
+; now use pointers!
+mov xc, 0x00
+mov xa, 0x01
+mov *xc, 0
+mov *xa, 1
+
+ptr_loop:
+	add *xc, *xa
+	cmp *xc, 20
+	jlt ptr_loop
+
+log *xc

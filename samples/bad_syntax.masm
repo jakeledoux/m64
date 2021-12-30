@@ -1,0 +1,3 @@
+top: jmp do_thing       ; ok: label def and instruction on one line
+do_thing:
+mov x0, 1 jmp top       ; bad: two instructions on one line

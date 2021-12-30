@@ -1,0 +1,12 @@
+; fib -- print all the fibonacci numbers less than 100
+; written by Jake Ledoux
+
+        mov xc, 1
+
+loop:
+        log xc
+        mov xa, xb
+        mov xb, xc
+        add xc, xa
+        cmp xc, 100
+        jlt loop

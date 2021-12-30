@@ -1,0 +1,10 @@
+; sample m64 program
+; written by Jake Ledoux
+
+.start:
+        mov x0, 4       ; store the decimal value "4" in general-purpose
+                        ; register 0
+loop:
+        add x0, 0x5     ; add the hex value "5F" to that register
+        mov x1, *x0     ; move the value from the address stored in x0 into x1
+        jmp loop        ; repeat forever

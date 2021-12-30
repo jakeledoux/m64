@@ -1,0 +1,7 @@
+; two plus two
+; a revolutionary program written by Jake Ledoux
+
+.start:
+        mov x0, 2
+        add x0, 2
+        log x0

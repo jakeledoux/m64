@@ -1,0 +1,45 @@
+// Non-token characters
+de_ref = _{ "*" }
+make_ref = _ { "&" }
+backslash = _{ "\\" }
+comma = _{ "," }
+double_quote = _{ "\"" }
+single_quote = _{ "'" }
+not_newline = { !NEWLINE ~ ANY }
+WHITESPACE = _{ " " | "\t" }
+COMMENT = _{ ";" ~ not_newline* }
+
+// Literals
+dec_literal = @{ ASCII_DIGIT+ }
+bin_literal = @{ ^"0b" ~ ASCII_BIN_DIGIT+ }
+hex_literal = @{ ^"0x" ~ ASCII_HEX_DIGIT+ }
+char_literal = @{ single_quote ~ backslash? ~ ASCII ~ single_quote }
+int_literal = { bin_literal | hex_literal | dec_literal | char_literal }
+string_literal = @{ double_quote ~ (!double_quote ~ ASCII)* ~ double_quote }
+literal = { int_literal | string_literal }
+
+// Pointers / addresses
+address = ${ de_ref ~ (int_literal | register) }
+
+// Registers
+register_index = @{ ASCII_HEX_DIGIT }
+register = ${ ^"x" ~ register_index }
+
+// Instructions
+operation = @{ LETTER{3,4} }
+argument = {
+    int_literal | address | register | label
+}
+instruction = { operation ~ ((argument ~ comma)* ~ argument)? }
+
+// Labels
+label = @{ ("." | "@")? ~ (ASCII_ALPHANUMERIC | "_")+ }
+label_definition = { label ~ ":" }
+
+// Program structure
+statement = { (label_definition | instruction) ~ (NEWLINE+ | &EOI) }
+file = {
+    SOI ~ NEWLINE* ~
+    statement* ~
+    &EOI
+}

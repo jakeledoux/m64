@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ast::File;
 use from_pest::FromPest;
-use interpreter::Computer;
+pub use interpreter::Computer;
 use masm::{MASMParser, Rule};
 use pest::Parser;
 
@@ -22,11 +22,14 @@ fn parse_str(src: &str) -> Result<File> {
 
 // TODO: remove main() and move main.rs -> lib.rs
 fn main() {
-    let sample_file = include_str!("../samples/counter.masm");
+    let sample_file = include_str!("../samples/fib.masm");
     let syntax_tree = parse_str(sample_file).unwrap();
     let mut computer = Computer::default();
 
-    computer.execute(syntax_tree);
+    computer.load_program(syntax_tree);
+    while computer.execute_until_yield().is_yield() {
+        println!("Yielding...");
+    }
 }
 
 #[cfg(test)]

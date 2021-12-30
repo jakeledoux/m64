@@ -4,6 +4,7 @@ use crate::ast::*;
 
 type LabelMap<'a> = HashMap<Label<'a>, usize>;
 
+// TODO: Don't panic, change computer status
 macro_rules! arg_panic {
     ($instruction:expr, $arguments:expr) => {
         panic!(
@@ -15,6 +16,58 @@ macro_rules! arg_panic {
 
 fn log<T: std::fmt::Debug>(program_counter: usize, value: T) {
     println!("LOG @{} -> {:#?}", program_counter, value)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    Ready,
+    Error,
+    Yield,
+    Finished,
+}
+
+impl Default for Status {
+    fn default() -> Self {
+        Self::Ready
+    }
+}
+
+impl Status {
+    /// Returns `true` if the status is [`Finished`] or [`Error`].
+    ///
+    /// [`Finished`]: Status::Finished
+    /// [`Error`]: Status::Error
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, Self::Finished) || matches!(self, Self::Error)
+    }
+
+    /// Returns `true` if the status is [`Ready`].
+    ///
+    /// [`Ready`]: Status::Ready
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    /// Returns `true` if the status is [`Yield`].
+    ///
+    /// [`Yield`]: Status::Yield
+    pub fn is_yield(&self) -> bool {
+        matches!(self, Self::Yield)
+    }
+
+    /// Returns `true` if the status is [`Finished`].
+    ///
+    /// [`Finished`]: Status::Finished
+    pub fn is_finished(&self) -> bool {
+        matches!(self, Self::Finished)
+    }
+
+    /// Returns `true` if the status is [`Error`].
+    ///
+    /// [`Error`]: Status::Error
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,10 +210,46 @@ impl Write for Address {
     }
 }
 
+pub struct Stack {
+    content: [u16; 10], // todo
+    pointer: usize,
+}
+
+impl Default for Stack {
+    fn default() -> Self {
+        let content = Default::default();
+        Self {
+            content,
+            pointer: content.len(),
+        }
+    }
+}
+
+impl Stack {
+    pub fn push(&mut self, value: u16) -> Result<(), ()> {
+        if self.pointer > 0 {
+            self.pointer -= 1;
+            self.content[self.pointer] = value;
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<u16> {
+        (self.pointer < self.content.len()).then(|| {
+            let value = self.content[self.pointer];
+            self.pointer += 1;
+            value
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct Memory {
     accumulator: u16,
     registers: [u16; 16],
+    stack: Stack,
     ram: [u16; 10], // todo: increase
     comparitor: Comparison,
 }
@@ -172,6 +261,7 @@ pub struct Computer<'a> {
     labels: LabelMap<'a>,
     statements: Vec<Statement<'a>>,
     memory: Memory,
+    status: Status,
 }
 
 impl<'a> Computer<'a> {
@@ -191,7 +281,13 @@ impl<'a> Computer<'a> {
             .collect();
     }
 
-    pub fn step(&mut self) -> bool {
+    pub fn step(&mut self) -> Status {
+        if self.status.is_yield() {
+            self.status = Status::Ready;
+        } else if self.status.is_stopped() {
+            return self.status;
+        }
+
         let statement = &self.statements[self.program_counter];
         self.program_counter += 1;
         match statement {
@@ -222,6 +318,24 @@ impl<'a> Computer<'a> {
                                 log(self.program_counter, address.read(&self.memory))
                             }
                         }
+                    }
+                }
+                Opcode::PSH => {
+                    // PSH [src: dyn read]
+                    if let Some(src) = arguments.get(0).as_read() {
+                        let value = src.read(&self.memory);
+                        self.memory.stack.push(value).expect("stack overflow");
+                    } else {
+                        arg_panic!(opcode, arguments)
+                    }
+                }
+                Opcode::POP => {
+                    // POP [dest: dyn write]
+                    if let Some(dest) = arguments.get(0).as_write() {
+                        let value = self.memory.stack.pop().expect("stack underflow");
+                        dest.write(&mut self.memory, value);
+                    } else {
+                        arg_panic!(opcode, arguments)
                     }
                 }
                 Opcode::ADD => {
@@ -310,7 +424,36 @@ impl<'a> Computer<'a> {
                         arg_panic!(opcode, arguments)
                     }
                 }
-                Opcode::CALL => todo!(),
+                Opcode::RUN => {
+                    match &arguments[..] {
+                        // RUN [dest: label]
+                        [Argument::Label(label)] => {
+                            // lower 16 bits of PC
+                            self.memory
+                                .stack
+                                .push((self.program_counter & 0xFFFF) as u16)
+                                .expect("stack overflow");
+                            // upper 16 bits of PC
+                            self.memory
+                                .stack
+                                .push((self.program_counter >> 16) as u16)
+                                .expect("stack overflow");
+                            self.program_counter = self.labels[label];
+                        }
+                        _ => arg_panic!(opcode, arguments),
+                    }
+                }
+                Opcode::RET => {
+                    // recombine PC from stack
+                    let program_counter =
+                        (((self.memory.stack.pop().expect("stack underflow") as u32) << 16)
+                            | self.memory.stack.pop().expect("stack underflow") as u32)
+                            as usize;
+                    self.program_counter = program_counter;
+                }
+                Opcode::YLD => {
+                    self.status = Status::Yield;
+                }
                 Opcode::JMP => {
                     match &arguments[..] {
                         // JMP [dest: label]
@@ -369,11 +512,25 @@ impl<'a> Computer<'a> {
             },
             Statement::LabelDefinition(_) => {}
         }
-        self.program_counter < self.statements.len()
+
+        if self.program_counter >= self.statements.len() {
+            self.status = Status::Finished;
+        }
+
+        self.status
     }
 
-    pub fn execute(&mut self, program: File<'a>) {
-        self.load_program(program);
-        while self.step() {}
+    pub fn execute(&mut self) -> Status {
+        loop {
+            let status = self.step();
+            if status.is_stopped() {
+                break status;
+            }
+        }
+    }
+
+    pub fn execute_until_yield(&mut self) -> Status {
+        while self.step().is_ready() {}
+        self.status
     }
 }

@@ -5,6 +5,7 @@
 
 loop:
         log xc
+        yld
         mov xa, xb
         mov xb, xc
         add xc, xa

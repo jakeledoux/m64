@@ -140,6 +140,8 @@ opcodes! {
     // Data processing / IO
     MOV,
     LOG,
+    PSH,
+    POP,
 
     // Arithmetic
     ADD,
@@ -151,8 +153,10 @@ opcodes! {
     // Comparisons
     CMP,
 
-    // Branching
-    CALL,
+    // Control flow
+    RUN,
+    RET,
+    YLD,
     JMP,
     JLT,
     JGT,

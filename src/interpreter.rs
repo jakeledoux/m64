@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use crate::ast::*;
 
+const STACK_SIZE: usize = 256;
+const RAM_SIZE: usize = 64_000;
+
 type LabelMap<'a> = HashMap<Label<'a>, usize>;
 
 // TODO: Don't panic, change computer status
@@ -211,13 +214,13 @@ impl Write for Address {
 }
 
 pub struct Stack {
-    content: [u16; 10], // todo
+    content: [u16; STACK_SIZE],
     pointer: usize,
 }
 
 impl Default for Stack {
     fn default() -> Self {
-        let content = Default::default();
+        let content = [0; STACK_SIZE];
         Self {
             content,
             pointer: content.len(),
@@ -245,13 +248,24 @@ impl Stack {
     }
 }
 
-#[derive(Default)]
 pub struct Memory {
     accumulator: u16,
     registers: [u16; 16],
     stack: Stack,
-    ram: [u16; 10], // todo: increase
+    ram: [u16; RAM_SIZE],
     comparitor: Comparison,
+}
+
+impl Default for Memory {
+    fn default() -> Self {
+        Self {
+            accumulator: Default::default(),
+            registers: Default::default(),
+            stack: Default::default(),
+            ram: [0; RAM_SIZE],
+            comparitor: Default::default(),
+        }
+    }
 }
 
 #[allow(unused)]

@@ -30,6 +30,7 @@ fn main() {
     while computer.execute_until_yield().is_yield() {
         println!("Yielding...");
     }
+    println!("{:?}", computer.status());
 }
 
 #[cfg(test)]

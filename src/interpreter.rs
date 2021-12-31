@@ -1,30 +1,55 @@
 use std::collections::HashMap;
 
 use crate::ast::*;
+use thiserror::Error;
 
 const STACK_SIZE: usize = 256;
 const RAM_SIZE: usize = 64_000;
 
 type LabelMap<'a> = HashMap<Label<'a>, usize>;
 
-// TODO: Don't panic, change computer status
-macro_rules! arg_panic {
-    ($instruction:expr, $arguments:expr) => {
-        panic!(
-            "Invalid arguments for opcode {:#?}: {:#?}!",
-            $instruction, $arguments
-        )
+macro_rules! expect {
+    ($expression:expr, $status:expr) => {
+        match $expression {
+            Ok(value) => {
+                $status = Status::Ready;
+                Some(value)
+            }
+            Err(e) => {
+                $status = Status::Error(e);
+                None
+            }
+        }
     };
+}
+
+fn raise_arg_error(status: &mut Status, opcode: &Opcode, args: &[Argument]) {
+    let args: &'static str = Box::leak(Box::new(format!("{:?}", args)));
+    *status = Status::Error(Error::ArgumentError {
+        opcode: *opcode,
+        args,
+    });
 }
 
 fn log<T: std::fmt::Debug>(program_counter: usize, value: T) {
     println!("LOG @{} -> {:#?}", program_counter, value)
 }
 
+#[allow(clippy::enum_variant_names)]
+#[derive(Error, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Error {
+    #[error("invalid arguments `{args:?}` for opcode `{opcode:?}`")]
+    ArgumentError { opcode: Opcode, args: &'static str },
+    #[error("stack overflow")]
+    StackOverflow,
+    #[error("stack underflow")]
+    StackUnderflow,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     Ready,
-    Error,
+    Error(Error),
     Yield,
     Finished,
 }
@@ -41,7 +66,7 @@ impl Status {
     /// [`Finished`]: Status::Finished
     /// [`Error`]: Status::Error
     pub fn is_stopped(&self) -> bool {
-        matches!(self, Self::Finished) || matches!(self, Self::Error)
+        matches!(self, Self::Finished) || matches!(self, Self::Error(_))
     }
 
     /// Returns `true` if the status is [`Ready`].
@@ -69,7 +94,7 @@ impl Status {
     ///
     /// [`Error`]: Status::Error
     pub fn is_error(&self) -> bool {
-        matches!(self, Self::Error)
+        matches!(self, Self::Error(_))
     }
 }
 
@@ -229,22 +254,24 @@ impl Default for Stack {
 }
 
 impl Stack {
-    pub fn push(&mut self, value: u16) -> Result<(), ()> {
+    pub fn push(&mut self, value: u16) -> Result<(), Error> {
         if self.pointer > 0 {
             self.pointer -= 1;
             self.content[self.pointer] = value;
             Ok(())
         } else {
-            Err(())
+            Err(Error::StackOverflow)
         }
     }
 
-    pub fn pop(&mut self) -> Option<u16> {
-        (self.pointer < self.content.len()).then(|| {
+    pub fn pop(&mut self) -> Result<u16, Error> {
+        if self.pointer < self.content.len() {
             let value = self.content[self.pointer];
             self.pointer += 1;
-            value
-        })
+            Ok(value)
+        } else {
+            Err(Error::StackOverflow)
+        }
     }
 }
 
@@ -279,6 +306,10 @@ pub struct Computer<'a> {
 }
 
 impl<'a> Computer<'a> {
+    pub fn status(&self) -> Status {
+        self.status
+    }
+
     pub fn load_program(&mut self, program: File<'a>) {
         self.statements = program.statements;
         self.labels = self
@@ -314,7 +345,7 @@ impl<'a> Computer<'a> {
                         let value = src.read(&self.memory);
                         dest.write(&mut self.memory, value);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::LOG => {
@@ -338,18 +369,19 @@ impl<'a> Computer<'a> {
                     // PSH [src: dyn read]
                     if let Some(src) = arguments.get(0).as_read() {
                         let value = src.read(&self.memory);
-                        self.memory.stack.push(value).expect("stack overflow");
+                        expect!(self.memory.stack.push(value), self.status);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::POP => {
                     // POP [dest: dyn write]
                     if let Some(dest) = arguments.get(0).as_write() {
-                        let value = self.memory.stack.pop().expect("stack underflow");
-                        dest.write(&mut self.memory, value);
+                        if let Some(value) = expect!(self.memory.stack.pop(), self.status) {
+                            dest.write(&mut self.memory, value);
+                        }
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::ADD => {
@@ -364,7 +396,7 @@ impl<'a> Computer<'a> {
                     else if let Some(src) = arguments.get(0).as_read() {
                         self.memory.accumulator += src.read(&self.memory);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::SUB => {
@@ -379,7 +411,7 @@ impl<'a> Computer<'a> {
                     else if let Some(src) = arguments.get(0).as_read() {
                         self.memory.accumulator -= src.read(&self.memory);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::MUL => {
@@ -394,7 +426,7 @@ impl<'a> Computer<'a> {
                     else if let Some(src) = arguments.get(0).as_read() {
                         self.memory.accumulator *= src.read(&self.memory);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::DIV => {
@@ -409,7 +441,7 @@ impl<'a> Computer<'a> {
                     else if let Some(src) = arguments.get(0).as_read() {
                         self.memory.accumulator /= src.read(&self.memory);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::MOD => {
@@ -424,7 +456,7 @@ impl<'a> Computer<'a> {
                     else if let Some(src) = arguments.get(0).as_read() {
                         self.memory.accumulator %= src.read(&self.memory);
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::CMP => {
@@ -435,7 +467,7 @@ impl<'a> Computer<'a> {
                         self.memory.comparitor =
                             lhs.read(&self.memory).cmp(&rhs.read(&self.memory)).into();
                     } else {
-                        arg_panic!(opcode, arguments)
+                        raise_arg_error(&mut self.status, opcode, arguments)
                     }
                 }
                 Opcode::RUN => {
@@ -443,27 +475,38 @@ impl<'a> Computer<'a> {
                         // RUN [dest: label]
                         [Argument::Label(label)] => {
                             // lower 16 bits of PC
-                            self.memory
-                                .stack
-                                .push((self.program_counter & 0xFFFF) as u16)
-                                .expect("stack overflow");
-                            // upper 16 bits of PC
-                            self.memory
-                                .stack
-                                .push((self.program_counter >> 16) as u16)
-                                .expect("stack overflow");
-                            self.program_counter = self.labels[label];
+                            if expect!(
+                                self.memory
+                                    .stack
+                                    .push((self.program_counter & 0xFFFF) as u16),
+                                self.status
+                            )
+                            .is_some()
+                            {
+                                // upper 16 bits of PC
+                                if expect!(
+                                    self.memory.stack.push((self.program_counter >> 16) as u16),
+                                    self.status
+                                )
+                                .is_some()
+                                {
+                                    self.program_counter = self.labels[label];
+                                }
+                            }
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::RET => {
                     // recombine PC from stack
-                    let program_counter =
-                        (((self.memory.stack.pop().expect("stack underflow") as u32) << 16)
-                            | self.memory.stack.pop().expect("stack underflow") as u32)
-                            as usize;
-                    self.program_counter = program_counter;
+                    if let (Some(upper_bits), Some(lower_bits)) = (
+                        expect!(self.memory.stack.pop(), self.status),
+                        expect!(self.memory.stack.pop(), self.status),
+                    ) {
+                        let program_counter =
+                            (((upper_bits as u32) << 16) | lower_bits as u32) as usize;
+                        self.program_counter = program_counter;
+                    }
                 }
                 Opcode::YLD => {
                     self.status = Status::Yield;
@@ -474,7 +517,7 @@ impl<'a> Computer<'a> {
                         [Argument::Label(label)] => {
                             self.program_counter = self.labels[label];
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::JLT => {
@@ -485,7 +528,7 @@ impl<'a> Computer<'a> {
                                 self.program_counter = self.labels[label];
                             }
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::JGT => {
@@ -496,7 +539,7 @@ impl<'a> Computer<'a> {
                                 self.program_counter = self.labels[label];
                             }
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::JEQ => {
@@ -507,7 +550,7 @@ impl<'a> Computer<'a> {
                                 self.program_counter = self.labels[label];
                             }
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::JNE => {
@@ -518,7 +561,7 @@ impl<'a> Computer<'a> {
                                 self.program_counter = self.labels[label];
                             }
                         }
-                        _ => arg_panic!(opcode, arguments),
+                        _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
                 }
                 Opcode::NOP => {}

@@ -1,5 +1,8 @@
 # m64
 
+> :warning: This crate is in *pre-alpha* and should not be used for any
+> purpose at this time.
+
 An emulator of the MAXCOM 64 personal computer.
 
 # Memory Map

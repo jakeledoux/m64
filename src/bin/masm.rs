@@ -21,6 +21,8 @@ struct Opts {
     file: PathBuf,
     #[clap(long, short)]
     print_output: bool,
+    #[clap(long, short)]
+    read_input: bool,
 }
 
 /// MASM interpreter CLI
@@ -39,10 +41,18 @@ fn main() {
                     computer.subscribe(|v| println!("{}", v));
                 }
 
+                if opts.read_input {
+                    computer.provide(|| {
+                        let mut buf = String::new();
+                        std::io::stdin()
+                            .read_line(&mut buf)
+                            .ok()
+                            .and_then(|_| buf.trim().parse().ok())
+                    });
+                }
+
                 if let Status::Error(error) = computer.execute() {
                     error!("{0:?} on line {1}: {0}", error, computer.program_counter());
-                } else {
-                    println!("done {:?}", computer.status());
                 }
             }
             Err(e) => error!("syntax error in {:?}{}", opts.file, e),

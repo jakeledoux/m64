@@ -1,0 +1,31 @@
+; Average
+; written by Jake Ledoux
+;
+; usage:
+; input as many numbers as you want, then input nothing to calculate the mean
+
+.start:
+        mov xa, 0       ; accumulator
+        mov xc, 0       ; counter
+input_loop:
+        inp x0          ; take input
+        cmp x0, 0       ; jump to sum if input is zero
+        jeq sum
+        psh x0          ; push non-zero input to stack
+        add xc, 1       ; increment counter
+        jmp input_loop
+sum:
+        mov xf, xc      ; make copy of counter for looping
+sum_loop:
+        cmp xf, 0       ; check if loop has finished
+        jeq divide
+        pop x0          ; pop num from stack and add it to accumulator
+        add xa, x0
+        sub xf, 1       ; decrement loop counter
+        jmp sum_loop
+divide:
+        cmp xc, 0       ; skip division if count is zero
+        jeq display
+        div xa, xc      ; divide the sum by the count
+display:
+        out xa          ; output the result

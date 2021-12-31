@@ -303,6 +303,7 @@ impl Default for Memory {
 pub struct BufStream<T> {
     content: Vec<T>,
     subscribers: Vec<Box<dyn Fn(&T)>>,
+    provider: Option<Box<dyn Fn() -> Option<T>>>,
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for BufStream<T> {
@@ -313,7 +314,11 @@ impl<T: std::fmt::Debug> std::fmt::Debug for BufStream<T> {
 
 impl<T> BufStream<T> {
     pub fn read(&mut self) -> Option<T> {
-        (!self.content.is_empty()).then(|| self.content.remove(0))
+        let mut value = (!self.content.is_empty()).then(|| self.content.remove(0));
+        if let Some(provider) = &self.provider {
+            value = value.or(provider());
+        }
+        value
     }
 
     pub fn read_all(&mut self) -> Vec<T> {
@@ -335,6 +340,10 @@ impl<T> BufStream<T> {
 
     pub fn subscribe(&mut self, callback: impl Fn(&T) + 'static) {
         self.subscribers.push(Box::new(callback))
+    }
+
+    pub fn provide(&mut self, provider: impl Fn() -> Option<T> + 'static) {
+        self.provider = Some(Box::new(provider));
     }
 }
 
@@ -717,5 +726,9 @@ impl<'a> Computer<'a> {
 
     pub fn write_iter(&mut self, iter: impl IntoIterator<Item = u16>) {
         self.input.write_iter(iter)
+    }
+
+    pub fn provide(&mut self, provider: impl Fn() -> Option<u16> + 'static) {
+        self.input.provide(provider)
     }
 }

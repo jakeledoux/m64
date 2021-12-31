@@ -5,7 +5,21 @@
 
 A MAXCOM 64 personal computer emulator.
 
-# Memory Map
+# Usage
+
+## MASM interpreter
+
+``` bash
+cargo install m64
+
+masm my_program.masm
+```
+
+Example MASM programs are available in `./samples`.
+
+# Specs
+
+## Memory Map *(NYI)*
 
 | start  | end    | usage           | byte represents                                            |
 |--------|--------|-----------------|------------------------------------------------------------|
@@ -14,7 +28,7 @@ A MAXCOM 64 personal computer emulator.
 | 0x07D0 | 0x0E9F | character map   | 8 bytes per character, each bit is a pixel, bytes are rows |
 | 0x0EA0 | 0x0F9F | program stack   | any data                                                   |
 
-# Instruction set
+## Instruction set
 | opcode | args (undocumented) |
 |--------|---------------------|
 | MOV    |                     |
@@ -38,7 +52,7 @@ A MAXCOM 64 personal computer emulator.
 | NOP    |                     |
 | HLT    |                     |
 
-# Standard Library
+## Standard Library *(NYI)*
 
 The M64 comes with a standard library of functions that can be called by pushing
 the arguments to the stack and executing `RUN {function code}`.

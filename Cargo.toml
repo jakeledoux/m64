@@ -1,6 +1,6 @@
 [package]
 name = "m64"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 license = "MIT"
 description = "A MAXCOM 64 personal computer emulator"
@@ -23,7 +23,6 @@ path = "src/bin/emulator.rs"
 required-features = ["emulator"]
 
 [dependencies]
-anyhow = "1.0.52"
 clap = { version = "3.0.0-rc.11", features = ["derive"], optional = true }
 from-pest = "0.3.1"
 minifb = { version = "0.20.0", optional = true }

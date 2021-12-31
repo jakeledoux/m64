@@ -372,6 +372,10 @@ impl<'a> Computer<'a> {
                 }
             })
             .collect();
+
+        if let Some(&start) = self.labels.get(&Label { value: ".start" }) {
+            self.program_counter = start;
+        }
     }
 
     pub fn step(&mut self) -> Status {
@@ -601,7 +605,14 @@ impl<'a> Computer<'a> {
                         // JLT [dest: label]
                         [Argument::Label(label)] => {
                             if self.memory.comparitor.is_less() {
-                                self.program_counter = self.labels[label];
+                                if let Some(&label_ptr) = self.labels.get(label) {
+                                    self.program_counter = label_ptr;
+                                } else {
+                                    let label: &'static str =
+                                        Box::leak(Box::new(label.value.to_string()));
+                                    self.status = Status::Error(Error::UndefinedLabelError(label));
+                                    return self.status;
+                                }
                             }
                         }
                         _ => raise_arg_error(&mut self.status, opcode, arguments),
@@ -612,7 +623,14 @@ impl<'a> Computer<'a> {
                         // JLT [dest: label]
                         [Argument::Label(label)] => {
                             if self.memory.comparitor.is_greater() {
-                                self.program_counter = self.labels[label];
+                                if let Some(&label_ptr) = self.labels.get(label) {
+                                    self.program_counter = label_ptr;
+                                } else {
+                                    let label: &'static str =
+                                        Box::leak(Box::new(label.value.to_string()));
+                                    self.status = Status::Error(Error::UndefinedLabelError(label));
+                                    return self.status;
+                                }
                             }
                         }
                         _ => raise_arg_error(&mut self.status, opcode, arguments),
@@ -623,7 +641,14 @@ impl<'a> Computer<'a> {
                         // JEQ [dest: label]
                         [Argument::Label(label)] => {
                             if self.memory.comparitor.is_equal() {
-                                self.program_counter = self.labels[label];
+                                if let Some(&label_ptr) = self.labels.get(label) {
+                                    self.program_counter = label_ptr;
+                                } else {
+                                    let label: &'static str =
+                                        Box::leak(Box::new(label.value.to_string()));
+                                    self.status = Status::Error(Error::UndefinedLabelError(label));
+                                    return self.status;
+                                }
                             }
                         }
                         _ => raise_arg_error(&mut self.status, opcode, arguments),
@@ -634,7 +659,14 @@ impl<'a> Computer<'a> {
                         // JNE [dest: label]
                         [Argument::Label(label)] => {
                             if self.memory.comparitor.is_not_equal() {
-                                self.program_counter = self.labels[label];
+                                if let Some(&label_ptr) = self.labels.get(label) {
+                                    self.program_counter = label_ptr;
+                                } else {
+                                    let label: &'static str =
+                                        Box::leak(Box::new(label.value.to_string()));
+                                    self.status = Status::Error(Error::UndefinedLabelError(label));
+                                    return self.status;
+                                }
                             }
                         }
                         _ => raise_arg_error(&mut self.status, opcode, arguments),

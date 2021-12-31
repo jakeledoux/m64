@@ -41,7 +41,7 @@ A MAXCOM 64 personal computer emulator.
 # Standard Library
 
 The M64 comes with a standard library of functions that can be called by pushing
-the arguments to the stack and executing `CALL {function code}`.
+the arguments to the stack and executing `RUN {function code}`.
 
 | function name | function code | args...                | returns    |
 |---------------|---------------|------------------------|------------|

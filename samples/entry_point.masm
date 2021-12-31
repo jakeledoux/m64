@@ -1,0 +1,4 @@
+add x0, 1   ; this line should be skipped
+.start:
+add x0, 1
+out x0      ; this should output `1`

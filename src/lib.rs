@@ -5,8 +5,11 @@ use pest::Parser;
 
 pub mod ast;
 pub mod interpreter;
-mod masm {
+pub mod masm {
     use pest_derive::Parser;
+
+    #[allow(non_camel_case_types)]
+    pub type msize = i64;
 
     #[derive(Parser)]
     #[grammar = "masm.pest"]

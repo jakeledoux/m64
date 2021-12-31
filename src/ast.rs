@@ -1,4 +1,4 @@
-use super::masm::Rule;
+use super::masm::{msize, Rule};
 use pest::Span;
 use pest_ast::FromPest;
 
@@ -30,7 +30,7 @@ macro_rules! impl_as_integer {
     ($($type:ty),*) => {
         $(
             impl AsIntegerValue for $type {
-                fn value(&self) -> u16 {
+                fn value(&self) -> msize {
                     self.value
                 }
             }
@@ -46,21 +46,21 @@ fn parse_register_index(span: Span) -> usize {
     usize::from_str_radix(span.as_str(), 16).expect("invalid digits will cause a syntax error")
 }
 
-fn parse_hex_literal(span: Span) -> u16 {
-    u16::from_str_radix(span.as_str().split_at(2).1, 16)
+fn parse_hex_literal(span: Span) -> msize {
+    msize::from_str_radix(span.as_str().split_at(2).1, 16)
         .expect("invalid digits will cause a syntax error")
 }
 
-fn parse_bin_literal(span: Span) -> u16 {
-    u16::from_str_radix(span.as_str().split_at(2).1, 2)
+fn parse_bin_literal(span: Span) -> msize {
+    msize::from_str_radix(span.as_str().split_at(2).1, 2)
         .expect("invalid digits will cause a syntax error")
 }
 
-fn parse_char_literal(span: Span) -> u16 {
+fn parse_char_literal(span: Span) -> msize {
     // todo: handle escaped characters like "\n" and "\r"
-    span.as_str().trim_matches('\'').chars().next().unwrap() as u16 // will not overflow because
-                                                                    // only ascii characters will
-                                                                    // parse
+    span.as_str().trim_matches('\'').chars().next().unwrap() as msize // will not overflow because
+                                                                      // only ascii characters will
+                                                                      // parse
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromPest)]
@@ -80,28 +80,28 @@ pub struct LabelDefinition<'i> {
 #[pest_ast(rule(Rule::dec_literal))]
 pub struct DecLiteral {
     #[pest_ast(outer(with(str_from_span), with(str::parse), with(Result::unwrap)))]
-    pub value: u16,
+    pub value: msize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPest)]
 #[pest_ast(rule(Rule::hex_literal))]
 pub struct HexLiteral {
     #[pest_ast(outer(with(parse_hex_literal)))]
-    pub value: u16,
+    pub value: msize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPest)]
 #[pest_ast(rule(Rule::bin_literal))]
 pub struct BinLiteral {
     #[pest_ast(outer(with(parse_bin_literal)))]
-    pub value: u16,
+    pub value: msize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPest)]
 #[pest_ast(rule(Rule::char_literal))]
 pub struct CharLiteral {
     #[pest_ast(outer(with(parse_char_literal)))]
-    pub value: u16,
+    pub value: msize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPest)]
@@ -192,13 +192,13 @@ pub struct File<'i> {
 }
 
 pub trait AsIntegerValue {
-    fn value(&self) -> u16;
+    fn value(&self) -> msize;
 }
 
 impl_as_integer!(DecLiteral, BinLiteral, HexLiteral, CharLiteral);
 
 impl AsIntegerValue for IntLiteral {
-    fn value(&self) -> u16 {
+    fn value(&self) -> msize {
         match self {
             IntLiteral::Dec(literal) => literal.value(),
             IntLiteral::Hex(literal) => literal.value(),

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use m64::{
     interpreter::{Computer, Status},
+    masm::msize,
     parse_str,
 };
 
@@ -25,6 +26,14 @@ struct Opts {
     read_input: bool,
 }
 
+fn stdin_provider() -> Option<msize> {
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_line(&mut buf)
+        .ok()
+        .and_then(|_| buf.trim().parse().ok())
+}
+
 /// MASM interpreter CLI
 fn main() {
     let opts = Opts::parse();
@@ -42,13 +51,7 @@ fn main() {
                 }
 
                 if opts.read_input {
-                    computer.provide(|| {
-                        let mut buf = String::new();
-                        std::io::stdin()
-                            .read_line(&mut buf)
-                            .ok()
-                            .and_then(|_| buf.trim().parse().ok())
-                    });
+                    computer.provide(stdin_provider);
                 }
 
                 if let Status::Error(error) = computer.execute() {

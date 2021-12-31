@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::*;
+use crate::{ast::*, masm::msize};
 use thiserror::Error;
 
 const STACK_SIZE: usize = 256;
@@ -156,11 +156,11 @@ impl From<std::cmp::Ordering> for Comparison {
 }
 
 trait Read {
-    fn read(&self, memory: &Memory) -> u16;
+    fn read(&self, memory: &Memory) -> msize;
 }
 
 trait Write: Read {
-    fn write(&self, memory: &mut Memory, value: u16);
+    fn write(&self, memory: &mut Memory, value: msize);
 }
 
 trait AsRead {
@@ -205,19 +205,19 @@ impl AsWrite for Argument<'_> {
 }
 
 impl Read for IntLiteral {
-    fn read(&self, _: &Memory) -> u16 {
+    fn read(&self, _: &Memory) -> msize {
         self.value()
     }
 }
 
 impl Read for Register {
-    fn read(&self, memory: &Memory) -> u16 {
+    fn read(&self, memory: &Memory) -> msize {
         memory.registers[self.index]
     }
 }
 
 impl Read for Address {
-    fn read(&self, memory: &Memory) -> u16 {
+    fn read(&self, memory: &Memory) -> msize {
         let address = match self {
             literal @ Address::IntLiteral(..) => literal.read(memory),
             Address::Register(register) => register.read(memory),
@@ -227,13 +227,13 @@ impl Read for Address {
 }
 
 impl Write for Register {
-    fn write(&self, memory: &mut Memory, value: u16) {
+    fn write(&self, memory: &mut Memory, value: msize) {
         memory.registers[self.index] = value;
     }
 }
 
 impl Write for Address {
-    fn write(&self, memory: &mut Memory, value: u16) {
+    fn write(&self, memory: &mut Memory, value: msize) {
         let address = match self {
             literal @ Address::IntLiteral(..) => literal.read(memory),
             Address::Register(register) => register.read(memory),
@@ -243,7 +243,7 @@ impl Write for Address {
 }
 
 pub struct Stack {
-    content: [u16; STACK_SIZE],
+    content: [msize; STACK_SIZE],
     pointer: usize,
 }
 
@@ -258,7 +258,7 @@ impl Default for Stack {
 }
 
 impl Stack {
-    pub fn push(&mut self, value: u16) -> Result<(), Error> {
+    pub fn push(&mut self, value: msize) -> Result<(), Error> {
         if self.pointer > 0 {
             self.pointer -= 1;
             self.content[self.pointer] = value;
@@ -268,7 +268,7 @@ impl Stack {
         }
     }
 
-    pub fn pop(&mut self) -> Result<u16, Error> {
+    pub fn pop(&mut self) -> Result<msize, Error> {
         if self.pointer < self.content.len() {
             let value = self.content[self.pointer];
             self.pointer += 1;
@@ -280,10 +280,10 @@ impl Stack {
 }
 
 pub struct Memory {
-    accumulator: u16,
-    registers: [u16; 16],
+    accumulator: msize,
+    registers: [msize; 16],
     stack: Stack,
-    ram: [u16; RAM_SIZE],
+    ram: [msize; RAM_SIZE],
     comparitor: Comparison,
 }
 
@@ -316,7 +316,7 @@ impl<T> BufStream<T> {
     pub fn read(&mut self) -> Option<T> {
         let mut value = (!self.content.is_empty()).then(|| self.content.remove(0));
         if let Some(provider) = &self.provider {
-            value = value.or(provider());
+            value = value.or_else(provider);
         }
         value
     }
@@ -354,8 +354,8 @@ pub struct Computer<'a> {
     statements: Vec<Statement<'a>>,
     memory: Memory,
     status: Status,
-    output: BufStream<u16>,
-    input: BufStream<u16>,
+    output: BufStream<msize>,
+    input: BufStream<msize>,
 }
 
 impl<'a> Computer<'a> {
@@ -560,14 +560,16 @@ impl<'a> Computer<'a> {
                             if expect!(
                                 self.memory
                                     .stack
-                                    .push((self.program_counter & 0xFFFF) as u16),
+                                    .push((self.program_counter & 0xFFFF) as msize),
                                 self.status
                             )
                             .is_some()
                             {
                                 // upper 16 bits of PC
                                 if expect!(
-                                    self.memory.stack.push((self.program_counter >> 16) as u16),
+                                    self.memory
+                                        .stack
+                                        .push((self.program_counter >> 16) as msize),
                                     self.status
                                 )
                                 .is_some()
@@ -708,27 +710,27 @@ impl<'a> Computer<'a> {
         self.status
     }
 
-    pub fn read(&mut self) -> Option<u16> {
+    pub fn read(&mut self) -> Option<msize> {
         self.output.read()
     }
 
-    pub fn read_all(&mut self) -> Vec<u16> {
+    pub fn read_all(&mut self) -> Vec<msize> {
         self.output.read_all()
     }
 
-    pub fn subscribe(&mut self, callback: impl Fn(&u16) + 'static) {
+    pub fn subscribe(&mut self, callback: impl Fn(&msize) + 'static) {
         self.output.subscribe(callback)
     }
 
-    pub fn write(&mut self, value: u16) {
+    pub fn write(&mut self, value: msize) {
         self.input.write(value)
     }
 
-    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = u16>) {
+    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = msize>) {
         self.input.write_iter(iter)
     }
 
-    pub fn provide(&mut self, provider: impl Fn() -> Option<u16> + 'static) {
+    pub fn provide(&mut self, provider: impl Fn() -> Option<msize> + 'static) {
         self.input.provide(provider)
     }
 }

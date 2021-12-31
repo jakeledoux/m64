@@ -3,7 +3,7 @@
 > :warning: This crate is in *pre-alpha* and should not be used for any
 > purpose at this time.
 
-An emulator of the MAXCOM 64 personal computer.
+A MAXCOM 64 personal computer emulator.
 
 # Memory Map
 
@@ -13,6 +13,30 @@ An emulator of the MAXCOM 64 personal computer.
 | 0x03E8 | 0x07CF | screen colors   | 0xFB where F is foreground color and B is background color |
 | 0x07D0 | 0x0E9F | character map   | 8 bytes per character, each bit is a pixel, bytes are rows |
 | 0x0EA0 | 0x0F9F | program stack   | any data                                                   |
+
+# Instruction set
+| opcode | args (undocumented) |
+|--------|---------------------|
+| MOV    |                     |
+| LOG    |                     |
+| PSH    |                     |
+| POP    |                     |
+| ADD    |                     |
+| SUB    |                     |
+| MUL    |                     |
+| DIV    |                     |
+| MOD    |                     |
+| CMP    |                     |
+| RUN    |                     |
+| RET    |                     |
+| YLD    |                     |
+| JMP    |                     |
+| JLT    |                     |
+| JGT    |                     |
+| JEQ    |                     |
+| JNE    |                     |
+| NOP    |                     |
+| HLT    |                     |
 
 # Standard Library
 

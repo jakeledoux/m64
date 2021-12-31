@@ -1,8 +1,12 @@
 [package]
 name = "m64"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 default-run = "m64"
+license = "MIT"
+description = "A MAXCOM 64 personal computer emulator"
+repository = "https://github.com/jakeledoux/m64"
+readme = "readme.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

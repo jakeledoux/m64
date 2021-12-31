@@ -1,12 +1,11 @@
 use anyhow::Result;
 use ast::File;
 use from_pest::FromPest;
-pub use interpreter::Computer;
 use masm::{MASMParser, Rule};
 use pest::Parser;
 
-mod ast;
-mod interpreter;
+pub mod ast;
+pub mod interpreter;
 mod masm {
     use pest_derive::Parser;
 
@@ -15,27 +14,17 @@ mod masm {
     pub struct MASMParser;
 }
 
-fn parse_str(src: &str) -> Result<File> {
+pub fn parse_str(src: &str) -> Result<File> {
     let mut parse_tree = MASMParser::parse(Rule::file, src)?;
     Ok(File::from_pest(&mut parse_tree).expect("Failed after parse. PEST may have a bug."))
 }
 
-// TODO: remove main() and move main.rs -> lib.rs
-fn main() {
-    let sample_file = include_str!("../samples/fib.masm");
-    let syntax_tree = parse_str(sample_file).unwrap();
-    let mut computer = Computer::default();
-
-    computer.load_program(syntax_tree);
-    while computer.execute_until_yield().is_yield() {
-        println!("Yielding...");
-    }
-    println!("{:?}", computer.status());
-}
-
 #[cfg(test)]
 mod test {
-    use crate::*;
+    use crate::{interpreter::Computer, parse_str};
+    use anyhow::Result;
+
+    // TODO: standardize error handling and remove `anyhow` dependency
 
     #[test]
     fn test_parse() -> Result<()> {
@@ -48,5 +37,16 @@ mod test {
         Ok(())
     }
 
-    // TODO: test programs with I/O to ensure correctness
+    #[test]
+    fn test_output() {
+        let fib = parse_str(include_str!("../samples/fib.masm")).unwrap();
+        let mut computer = Computer::default();
+        computer.load_program(fib);
+        computer.execute();
+        assert!(computer.status().is_finished());
+        assert_eq!(
+            computer.read_all(),
+            vec![1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+        );
+    }
 }

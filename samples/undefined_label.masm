@@ -1,0 +1,2 @@
+; intentionally errors by jumping to an undefined label
+jmp hehe

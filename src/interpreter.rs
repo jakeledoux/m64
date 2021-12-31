@@ -40,10 +40,14 @@ fn log<T: std::fmt::Debug>(program_counter: usize, value: T) {
 pub enum Error {
     #[error("invalid arguments `{args:?}` for opcode `{opcode:?}`")]
     ArgumentError { opcode: Opcode, args: &'static str },
-    #[error("stack overflow")]
-    StackOverflow,
-    #[error("stack underflow")]
-    StackUnderflow,
+    #[error("attempted push to full stack")]
+    StackOverflowError,
+    #[error("attempted read from empty stack")]
+    StackUnderflowError,
+    #[error("tried to read from empty input buffer")]
+    InputError,
+    #[error("attempted to use undefined label {0:?}")]
+    UndefinedLabelError(&'static str),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,7 +264,7 @@ impl Stack {
             self.content[self.pointer] = value;
             Ok(())
         } else {
-            Err(Error::StackOverflow)
+            Err(Error::StackOverflowError)
         }
     }
 
@@ -270,7 +274,7 @@ impl Stack {
             self.pointer += 1;
             Ok(value)
         } else {
-            Err(Error::StackOverflow)
+            Err(Error::StackUnderflowError)
         }
     }
 }
@@ -295,7 +299,45 @@ impl Default for Memory {
     }
 }
 
-#[allow(unused)]
+#[derive(Default)]
+pub struct BufStream<T> {
+    content: Vec<T>,
+    subscribers: Vec<Box<dyn Fn(&T)>>,
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for BufStream<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.content.fmt(f)
+    }
+}
+
+impl<T> BufStream<T> {
+    pub fn read(&mut self) -> Option<T> {
+        (!self.content.is_empty()).then(|| self.content.remove(0))
+    }
+
+    pub fn read_all(&mut self) -> Vec<T> {
+        self.content.drain(..).collect()
+    }
+
+    pub fn write(&mut self, value: T) {
+        self.subscribers.iter().for_each(|f| f(&value));
+        self.content.push(value);
+    }
+
+    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = T>) {
+        let mut new_content: Vec<T> = iter.into_iter().collect();
+        self.subscribers
+            .iter()
+            .for_each(|f| new_content.iter().for_each(|v| f(v)));
+        self.content.append(&mut new_content)
+    }
+
+    pub fn subscribe(&mut self, callback: impl Fn(&T) + 'static) {
+        self.subscribers.push(Box::new(callback))
+    }
+}
+
 #[derive(Default)]
 pub struct Computer<'a> {
     program_counter: usize,
@@ -303,11 +345,17 @@ pub struct Computer<'a> {
     statements: Vec<Statement<'a>>,
     memory: Memory,
     status: Status,
+    output: BufStream<u16>,
+    input: BufStream<u16>,
 }
 
 impl<'a> Computer<'a> {
     pub fn status(&self) -> Status {
         self.status
+    }
+
+    pub fn program_counter(&self) -> usize {
+        self.program_counter
     }
 
     pub fn load_program(&mut self, program: File<'a>) {
@@ -379,6 +427,27 @@ impl<'a> Computer<'a> {
                     if let Some(dest) = arguments.get(0).as_write() {
                         if let Some(value) = expect!(self.memory.stack.pop(), self.status) {
                             dest.write(&mut self.memory, value);
+                        }
+                    } else {
+                        raise_arg_error(&mut self.status, opcode, arguments)
+                    }
+                }
+                Opcode::OUT => {
+                    // OUT [src: dyn read]
+                    if let Some(src) = arguments.get(0).as_read() {
+                        let value = src.read(&self.memory);
+                        self.output.write(value);
+                    } else {
+                        raise_arg_error(&mut self.status, opcode, arguments)
+                    }
+                }
+                Opcode::INP => {
+                    // INP [dest: dyn write]
+                    if let Some(dest) = arguments.get(0).as_write() {
+                        if let Some(value) = self.input.read() {
+                            dest.write(&mut self.memory, value);
+                        } else {
+                            self.status = Status::Error(Error::InputError);
                         }
                     } else {
                         raise_arg_error(&mut self.status, opcode, arguments)
@@ -515,7 +584,14 @@ impl<'a> Computer<'a> {
                     match &arguments[..] {
                         // JMP [dest: label]
                         [Argument::Label(label)] => {
-                            self.program_counter = self.labels[label];
+                            if let Some(&label_ptr) = self.labels.get(label) {
+                                self.program_counter = label_ptr;
+                            } else {
+                                let label: &'static str =
+                                    Box::leak(Box::new(label.value.to_string()));
+                                self.status = Status::Error(Error::UndefinedLabelError(label));
+                                return self.status;
+                            }
                         }
                         _ => raise_arg_error(&mut self.status, opcode, arguments),
                     }
@@ -589,5 +665,25 @@ impl<'a> Computer<'a> {
     pub fn execute_until_yield(&mut self) -> Status {
         while self.step().is_ready() {}
         self.status
+    }
+
+    pub fn read(&mut self) -> Option<u16> {
+        self.output.read()
+    }
+
+    pub fn read_all(&mut self) -> Vec<u16> {
+        self.output.read_all()
+    }
+
+    pub fn subscribe(&mut self, callback: impl Fn(&u16) + 'static) {
+        self.output.subscribe(callback)
+    }
+
+    pub fn write(&mut self, value: u16) {
+        self.input.write(value)
+    }
+
+    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = u16>) {
+        self.input.write_iter(iter)
     }
 }

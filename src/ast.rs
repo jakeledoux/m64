@@ -142,6 +142,8 @@ opcodes! {
     LOG,
     PSH,
     POP,
+    OUT,
+    INP,
 
     // Arithmetic
     ADD,

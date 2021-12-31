@@ -1,0 +1,4 @@
+; intentionally causes a stack overflow
+loop:
+psh 0
+jmp loop

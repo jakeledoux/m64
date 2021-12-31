@@ -4,7 +4,7 @@
         mov xc, 1
 
 loop:
-        log xc
+        out xc
         yld
         mov xa, xb
         mov xb, xc

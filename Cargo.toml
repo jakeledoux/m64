@@ -1,19 +1,32 @@
 [package]
 name = "m64"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
-default-run = "m64"
 license = "MIT"
 description = "A MAXCOM 64 personal computer emulator"
 repository = "https://github.com/jakeledoux/m64"
 readme = "readme.md"
+default-run = "masm"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["cli"]
+cli = ["clap"]
+emulator = ["minifb"]
+
+[[bin]]
+name = "masm"
+required-features = ["cli"]
+
+[[bin]]
+name = "m64"
+path = "src/bin/emulator.rs"
+required-features = ["emulator"]
 
 [dependencies]
 anyhow = "1.0.52"
+clap = { version = "3.0.0-rc.11", features = ["derive"], optional = true }
 from-pest = "0.3.1"
-minifb = "0.20.0"
+minifb = { version = "0.20.0", optional = true }
 pest = "2.1.3"
 pest-ast = "0.3.3"
 pest_derive = "2.1.0"

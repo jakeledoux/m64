@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{ast::*, masm::msize};
+use crate::{asm::msize, ast::*};
 use thiserror::Error;
 
 type LabelMap<'a> = HashMap<Label<'a>, usize>;
@@ -361,7 +361,7 @@ impl<T> BufStream<T> {
     }
 }
 
-/// Virtual computer for executing MASM programs.
+/// Virtual computer for executing M64 ASM programs.
 #[derive(Default)]
 pub struct Computer<'a, const R: usize, const S: usize> {
     program_counter: usize,

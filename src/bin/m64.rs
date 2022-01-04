@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use m64::{
+    asm::msize,
     interpreter::{Computer64, Status},
-    masm::msize,
     parse_str,
 };
 
@@ -15,7 +15,7 @@ macro_rules! error {
 }
 
 #[derive(Parser, Debug)]
-#[clap(name = "masm")]
+#[clap(name = "m64")]
 #[clap(about = "An interpreter for the MAXCOM assembly language")]
 struct Opts {
     #[clap(required = true, parse(from_os_str))]
@@ -34,7 +34,7 @@ fn stdin_provider() -> Option<msize> {
         .and_then(|_| buf.trim().parse().ok())
 }
 
-/// MASM interpreter CLI
+/// M64 ASM interpreter CLI
 fn main() {
     let opts = Opts::parse();
 

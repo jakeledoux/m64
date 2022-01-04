@@ -1,4 +1,4 @@
-use super::masm::{msize, Rule};
+use super::asm::{msize, Rule};
 use pest::Span;
 use pest_ast::FromPest;
 

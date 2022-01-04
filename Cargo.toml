@@ -6,7 +6,7 @@ license = "MIT"
 description = "A MAXCOM 64 personal computer emulator"
 repository = "https://github.com/jakeledoux/m64"
 readme = "readme.md"
-default-run = "masm"
+default-run = "m64"
 
 [features]
 default = ["cli"]
@@ -14,11 +14,11 @@ cli = ["clap"]
 emulator = ["minifb"]
 
 [[bin]]
-name = "masm"
+name = "m64"
 required-features = ["cli"]
 
 [[bin]]
-name = "m64"
+name = "m64-emu"
 path = "src/bin/emulator.rs"
 required-features = ["emulator"]
 

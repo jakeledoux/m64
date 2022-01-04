@@ -10,8 +10,8 @@ default-run = "m64"
 
 [features]
 default = ["cli"]
-cli = ["clap"]
-emulator = ["minifb"]
+cli = ["clap", "eyre"]
+emulator = ["cli", "minifb"]
 
 [[bin]]
 name = "m64"
@@ -24,6 +24,7 @@ required-features = ["emulator"]
 
 [dependencies]
 clap = { version = "3.0.0", features = ["derive"], optional = true }
+eyre = { version = "0.6.5", optional = true }
 from-pest = "0.3.1"
 minifb = { version = "0.20.0", optional = true }
 pest = "2.1.3"

@@ -12,7 +12,7 @@ A MAXCOM 64 personal computer emulator.
 ``` bash
 cargo install m64
 
-m64 my_program.m64
+m64 run my_program.m64
 ```
 
 Example M64 assembly programs are available in `./samples`.

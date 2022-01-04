@@ -23,7 +23,7 @@ pub fn parse_str(src: &str) -> Result<File, pest::error::Error<Rule>> {
 
 #[cfg(test)]
 mod test {
-    use crate::{interpreter::Computer, parse_str};
+    use crate::{interpreter::Computer64, parse_str};
 
     #[test]
     fn test_parse() {
@@ -50,9 +50,9 @@ mod test {
         );
     }
 
-    fn execute_program(program: &str) -> Computer {
+    fn execute_program(program: &str) -> Computer64 {
         let program = parse_str(program).unwrap();
-        let mut computer = Computer::default();
+        let mut computer = Computer64::default();
         computer.load_program(program);
         computer.execute();
         computer

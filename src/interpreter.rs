@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use crate::{ast::*, masm::msize};
 use thiserror::Error;
 
-const STACK_SIZE: usize = 256;
-const RAM_SIZE: usize = 64_000;
-
 type LabelMap<'a> = HashMap<Label<'a>, usize>;
+
+pub type Computer64<'a> = Computer<'a, 64_000, 256>;
 
 macro_rules! expect {
     ($expression:expr, $status:expr) => {
@@ -156,28 +155,28 @@ impl From<std::cmp::Ordering> for Comparison {
 }
 
 /// The `Read` trait allows for making instructions generic over data sources.
-trait Read {
-    fn read(&self, memory: &Memory) -> msize;
+trait Read<const R: usize, const S: usize> {
+    fn read(&self, memory: &Memory<R, S>) -> msize;
 }
 
 /// The `Write` trait allows for making instructions generic over data stores.
-trait Write: Read {
-    fn write(&self, memory: &mut Memory, value: msize);
+trait Write<const R: usize, const S: usize>: Read<R, S> {
+    fn write(&self, memory: &mut Memory<R, S>, value: msize);
 }
 
 /// The `AsRead` trait allows for partialially readable types to downcast into trait objects.
-trait AsRead {
-    fn as_read(&self) -> Option<&dyn Read>;
+trait AsRead<const R: usize, const S: usize> {
+    fn as_read(&self) -> Option<&dyn Read<R, S>>;
 }
 
-impl AsRead for Option<&Argument<'_>> {
-    fn as_read(&self) -> Option<&dyn Read> {
+impl<const R: usize, const S: usize> AsRead<R, S> for Option<&Argument<'_>> {
+    fn as_read(&self) -> Option<&dyn Read<R, S>> {
         self.and_then(|inside| inside.as_read())
     }
 }
 
-impl AsRead for Argument<'_> {
-    fn as_read(&self) -> Option<&dyn Read> {
+impl<const R: usize, const S: usize> AsRead<R, S> for Argument<'_> {
+    fn as_read(&self) -> Option<&dyn Read<R, S>> {
         Some(match self {
             Argument::Register(register) => register,
             Argument::Address(address) => address,
@@ -188,18 +187,18 @@ impl AsRead for Argument<'_> {
 }
 
 /// The `AsWrite` trait allows for partialially readable types to downcast into trait objects.
-trait AsWrite {
-    fn as_write(&self) -> Option<&dyn Write>;
+trait AsWrite<const R: usize, const S: usize> {
+    fn as_write(&self) -> Option<&dyn Write<R, S>>;
 }
 
-impl AsWrite for Option<&Argument<'_>> {
-    fn as_write(&self) -> Option<&dyn Write> {
+impl<const R: usize, const S: usize> AsWrite<R, S> for Option<&Argument<'_>> {
+    fn as_write(&self) -> Option<&dyn Write<R, S>> {
         self.and_then(|inside| inside.as_write())
     }
 }
 
-impl AsWrite for Argument<'_> {
-    fn as_write(&self) -> Option<&dyn Write> {
+impl<const R: usize, const S: usize> AsWrite<R, S> for Argument<'_> {
+    fn as_write(&self) -> Option<&dyn Write<R, S>> {
         Some(match self {
             Argument::Register(register) => register,
             Argument::Address(address) => address,
@@ -208,20 +207,20 @@ impl AsWrite for Argument<'_> {
     }
 }
 
-impl Read for IntLiteral {
-    fn read(&self, _: &Memory) -> msize {
+impl<const R: usize, const S: usize> Read<R, S> for IntLiteral {
+    fn read(&self, _: &Memory<R, S>) -> msize {
         self.value()
     }
 }
 
-impl Read for Register {
-    fn read(&self, memory: &Memory) -> msize {
+impl<const R: usize, const S: usize> Read<R, S> for Register {
+    fn read(&self, memory: &Memory<R, S>) -> msize {
         memory.registers[self.index]
     }
 }
 
-impl Read for Address {
-    fn read(&self, memory: &Memory) -> msize {
+impl<const R: usize, const S: usize> Read<R, S> for Address {
+    fn read(&self, memory: &Memory<R, S>) -> msize {
         let address = match self {
             literal @ Address::IntLiteral(..) => literal.read(memory),
             Address::Register(register) => register.read(memory),
@@ -230,14 +229,14 @@ impl Read for Address {
     }
 }
 
-impl Write for Register {
-    fn write(&self, memory: &mut Memory, value: msize) {
+impl<const R: usize, const S: usize> Write<R, S> for Register {
+    fn write(&self, memory: &mut Memory<R, S>, value: msize) {
         memory.registers[self.index] = value;
     }
 }
 
-impl Write for Address {
-    fn write(&self, memory: &mut Memory, value: msize) {
+impl<const R: usize, const S: usize> Write<R, S> for Address {
+    fn write(&self, memory: &mut Memory<R, S>, value: msize) {
         let address = match self {
             literal @ Address::IntLiteral(..) => literal.read(memory),
             Address::Register(register) => register.read(memory),
@@ -247,14 +246,14 @@ impl Write for Address {
 }
 
 /// Statically allocated stack memory.
-pub struct Stack {
-    content: [msize; STACK_SIZE],
+pub struct Stack<const S: usize> {
+    content: [msize; S],
     pointer: usize,
 }
 
-impl Default for Stack {
+impl<const S: usize> Default for Stack<S> {
     fn default() -> Self {
-        let content = [0; STACK_SIZE];
+        let content = [0; S];
         Self {
             content,
             pointer: content.len(),
@@ -262,7 +261,7 @@ impl Default for Stack {
     }
 }
 
-impl Stack {
+impl<const S: usize> Stack<S> {
     /// Push an element to the end of the stack.
     pub fn push(&mut self, value: msize) -> Result<(), Error> {
         if self.pointer > 0 {
@@ -287,21 +286,21 @@ impl Stack {
 }
 
 /// Memory component of [`Computer`].
-pub struct Memory {
+pub struct Memory<const R: usize, const S: usize> {
     accumulator: msize,
     registers: [msize; 16],
-    stack: Stack,
-    ram: [msize; RAM_SIZE],
+    stack: Stack<S>,
+    ram: [msize; R],
     comparitor: Comparison,
 }
 
-impl Default for Memory {
+impl<const R: usize, const S: usize> Default for Memory<R, S> {
     fn default() -> Self {
         Self {
             accumulator: Default::default(),
             registers: Default::default(),
             stack: Default::default(),
-            ram: [0; RAM_SIZE],
+            ram: [0; R],
             comparitor: Default::default(),
         }
     }
@@ -364,17 +363,17 @@ impl<T> BufStream<T> {
 
 /// Virtual computer for executing MASM programs.
 #[derive(Default)]
-pub struct Computer<'a> {
+pub struct Computer<'a, const R: usize, const S: usize> {
     program_counter: usize,
     labels: LabelMap<'a>,
     statements: Vec<Statement<'a>>,
-    memory: Memory,
+    memory: Memory<R, S>,
     status: Status,
     output: BufStream<msize>,
     input: BufStream<msize>,
 }
 
-impl<'a> Computer<'a> {
+impl<'a, const R: usize, const S: usize> Computer<'a, R, S> {
     /// Loads new program into computer, overwriting the old one.
     ///
     /// This does not reset the computer's state apart from the program counter. Either have your

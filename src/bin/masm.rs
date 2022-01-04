@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use m64::{
-    interpreter::{Computer, Status},
+    interpreter::{Computer64, Status},
     masm::msize,
     parse_str,
 };
@@ -43,7 +43,7 @@ fn main() {
         // parse AST
         match parse_str(&file) {
             Ok(syntax_tree) => {
-                let mut computer = Computer::default();
+                let mut computer = Computer64::default();
                 computer.load_program(syntax_tree);
 
                 if opts.print_output {

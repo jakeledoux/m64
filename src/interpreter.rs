@@ -155,14 +155,17 @@ impl From<std::cmp::Ordering> for Comparison {
     }
 }
 
+/// The `Read` trait allows for making instructions generic over data sources.
 trait Read {
     fn read(&self, memory: &Memory) -> msize;
 }
 
+/// The `Write` trait allows for making instructions generic over data stores.
 trait Write: Read {
     fn write(&self, memory: &mut Memory, value: msize);
 }
 
+/// The `AsRead` trait allows for partialially readable types to downcast into trait objects.
 trait AsRead {
     fn as_read(&self) -> Option<&dyn Read>;
 }
@@ -184,6 +187,7 @@ impl AsRead for Argument<'_> {
     }
 }
 
+/// The `AsWrite` trait allows for partialially readable types to downcast into trait objects.
 trait AsWrite {
     fn as_write(&self) -> Option<&dyn Write>;
 }
@@ -242,6 +246,7 @@ impl Write for Address {
     }
 }
 
+/// Statically allocated stack memory.
 pub struct Stack {
     content: [msize; STACK_SIZE],
     pointer: usize,
@@ -258,6 +263,7 @@ impl Default for Stack {
 }
 
 impl Stack {
+    /// Push an element to the end of the stack.
     pub fn push(&mut self, value: msize) -> Result<(), Error> {
         if self.pointer > 0 {
             self.pointer -= 1;
@@ -268,6 +274,7 @@ impl Stack {
         }
     }
 
+    /// Pop an element from the end of the stack.
     pub fn pop(&mut self) -> Result<msize, Error> {
         if self.pointer < self.content.len() {
             let value = self.content[self.pointer];
@@ -279,6 +286,7 @@ impl Stack {
     }
 }
 
+/// Memory component of [`Computer`].
 pub struct Memory {
     accumulator: msize,
     registers: [msize; 16],
@@ -299,6 +307,7 @@ impl Default for Memory {
     }
 }
 
+/// Data buffer for handling computer I/O.
 #[derive(Default)]
 pub struct BufStream<T> {
     content: Vec<T>,
@@ -313,6 +322,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for BufStream<T> {
 }
 
 impl<T> BufStream<T> {
+    /// Consume a single value from the output.
     pub fn read(&mut self) -> Option<T> {
         let mut value = (!self.content.is_empty()).then(|| self.content.remove(0));
         if let Some(provider) = &self.provider {
@@ -321,15 +331,18 @@ impl<T> BufStream<T> {
         value
     }
 
+    /// Consume entire output buffer.
     pub fn read_all(&mut self) -> Vec<T> {
         self.content.drain(..).collect()
     }
 
+    /// Extend input with a single value.
     pub fn write(&mut self, value: T) {
         self.subscribers.iter().for_each(|f| f(&value));
         self.content.push(value);
     }
 
+    /// Extend input with contents of iterator.
     pub fn write_iter(&mut self, iter: impl IntoIterator<Item = T>) {
         let mut new_content: Vec<T> = iter.into_iter().collect();
         self.subscribers
@@ -338,15 +351,18 @@ impl<T> BufStream<T> {
         self.content.append(&mut new_content)
     }
 
+    /// Subscribe to output events with a non-consuming listener callback.
     pub fn subscribe(&mut self, callback: impl Fn(&T) + 'static) {
         self.subscribers.push(Box::new(callback))
     }
 
+    /// Provide a source of input to fall back on.
     pub fn provide(&mut self, provider: impl Fn() -> Option<T> + 'static) {
         self.provider = Some(Box::new(provider));
     }
 }
 
+/// Virtual computer for executing MASM programs.
 #[derive(Default)]
 pub struct Computer<'a> {
     program_counter: usize,
@@ -359,14 +375,11 @@ pub struct Computer<'a> {
 }
 
 impl<'a> Computer<'a> {
-    pub fn status(&self) -> Status {
-        self.status
-    }
-
-    pub fn program_counter(&self) -> usize {
-        self.program_counter
-    }
-
+    /// Loads new program into computer, overwriting the old one.
+    ///
+    /// This does not reset the computer's state apart from the program counter. Either have your
+    /// program intitialize the memory it wishes to use or call [`Computer::reset`] before
+    /// executing.
     pub fn load_program(&mut self, program: File<'a>) {
         self.statements = program.statements;
         self.labels = self
@@ -382,11 +395,92 @@ impl<'a> Computer<'a> {
             })
             .collect();
 
-        if let Some(&start) = self.labels.get(&Label { value: ".start" }) {
-            self.program_counter = start;
+        self.program_counter = self
+            .labels
+            .get(&Label { value: ".start" })
+            .copied()
+            .unwrap_or_default();
+    }
+
+    /// Chainable variant of [`Computer::load_program`].
+    pub fn with_program(mut self, program: File<'a>) -> Self {
+        self.load_program(program);
+        self
+    }
+
+    /// Reset's computer's memory
+    pub fn reset(&mut self) {
+        self.memory = Memory::default();
+        self.program_counter = self
+            .labels
+            .get(&Label { value: ".start" })
+            .copied()
+            .unwrap_or_default();
+    }
+
+    /// Chainable variant of [`Computer::reset`].
+    pub fn with_reset(mut self) -> Self {
+        self.reset();
+        self
+    }
+
+    /// Ge the current status of the computer.
+    pub fn status(&self) -> Status {
+        self.status
+    }
+
+    /// Get the current value of the program counter.
+    pub fn program_counter(&self) -> usize {
+        self.program_counter
+    }
+
+    /// Execute until program terminates.
+    pub fn execute(&mut self) -> Status {
+        loop {
+            let status = self.step();
+            if status.is_stopped() {
+                break status;
+            }
         }
     }
 
+    /// Execute until YLD instruction or program terminates.
+    pub fn execute_until_yield(&mut self) -> Status {
+        while self.step().is_ready() {}
+        self.status
+    }
+
+    /// Consume a single value from the output.
+    pub fn read(&mut self) -> Option<msize> {
+        self.output.read()
+    }
+
+    /// Consume entire output buffer.
+    pub fn read_all(&mut self) -> Vec<msize> {
+        self.output.read_all()
+    }
+
+    /// Extend input with a single value.
+    pub fn write(&mut self, value: msize) {
+        self.input.write(value)
+    }
+
+    /// Extend input with contents of iterator.
+    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = msize>) {
+        self.input.write_iter(iter)
+    }
+
+    /// Subscribe to output events with a non-consuming listener callback.
+    pub fn subscribe(&mut self, callback: impl Fn(&msize) + 'static) {
+        self.output.subscribe(callback)
+    }
+
+    /// Provide a source of input to fall back on.
+    pub fn provide(&mut self, provider: impl Fn() -> Option<msize> + 'static) {
+        self.input.provide(provider)
+    }
+
+    /// Execute a single instruction.
     pub fn step(&mut self) -> Status {
         if self.status.is_yield() {
             self.status = Status::Ready;
@@ -694,43 +788,5 @@ impl<'a> Computer<'a> {
         }
 
         self.status
-    }
-
-    pub fn execute(&mut self) -> Status {
-        loop {
-            let status = self.step();
-            if status.is_stopped() {
-                break status;
-            }
-        }
-    }
-
-    pub fn execute_until_yield(&mut self) -> Status {
-        while self.step().is_ready() {}
-        self.status
-    }
-
-    pub fn read(&mut self) -> Option<msize> {
-        self.output.read()
-    }
-
-    pub fn read_all(&mut self) -> Vec<msize> {
-        self.output.read_all()
-    }
-
-    pub fn subscribe(&mut self, callback: impl Fn(&msize) + 'static) {
-        self.output.subscribe(callback)
-    }
-
-    pub fn write(&mut self, value: msize) {
-        self.input.write(value)
-    }
-
-    pub fn write_iter(&mut self, iter: impl IntoIterator<Item = msize>) {
-        self.input.write_iter(iter)
-    }
-
-    pub fn provide(&mut self, provider: impl Fn() -> Option<msize> + 'static) {
-        self.input.provide(provider)
     }
 }

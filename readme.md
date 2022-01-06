@@ -31,26 +31,26 @@ Example M64 assembly programs are available in `./samples`.
 | memory address                 | *{literal/register} |
 
 ## Instruction set
-| opcode | args (undocumented) |
+| opcode | args                |
 |--------|---------------------|
-| MOV    |                     |
-| LOG    |                     |
-| PSH    |                     |
-| POP    |                     |
-| ADD    |                     |
-| SUB    |                     |
-| MUL    |                     |
-| DIV    |                     |
-| MOD    |                     |
-| CMP    |                     |
-| RUN    |                     |
+| MOV    | dest, src           |
+| LOG    | src                 |
+| PSH    | src                 |
+| POP    | dest                |
+| ADD    | dest, src           |
+| SUB    | dest, src           |
+| MUL    | dest, src           |
+| DIV    | dest, src           |
+| MOD    | dest, src           |
+| CMP    | src, src            |
+| RUN    | label               |
 | RET    |                     |
 | YLD    |                     |
-| JMP    |                     |
-| JLT    |                     |
-| JGT    |                     |
-| JEQ    |                     |
-| JNE    |                     |
+| JMP    | label               |
+| JLT    | label               |
+| JGT    | label               |
+| JEQ    | label               |
+| JNE    | label               |
 | NOP    |                     |
 | HLT    |                     |
 

@@ -19,6 +19,17 @@ Example M64 assembly programs are available in `./samples`.
 
 # Specs
 
+## Literal syntax
+
+| kind                           | usage               |
+|--------------------------------|---------------------|
+| decimal literal                | 33                  |
+| binary literal                 | 0b100001            |
+| hex literal                    | 0x21                |
+| char literal                   | '!'                 |
+| general-purpose registers (16) | X0-XF               |
+| memory address                 | *{literal/register} |
+
 ## Instruction set
 | opcode | args (undocumented) |
 |--------|---------------------|

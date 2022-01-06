@@ -48,6 +48,10 @@ mod test {
             computer.read_all(),
             vec![1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
         );
+
+        let mut computer = execute_program(include_str!("../samples/ram_io.m64"));
+        assert!(computer.status().is_finished());
+        assert_eq!(computer.read(), Some(777));
     }
 
     fn execute_program(program: &str) -> Computer64 {

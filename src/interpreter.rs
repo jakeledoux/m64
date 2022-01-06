@@ -222,7 +222,7 @@ impl<const R: usize, const S: usize> Read<R, S> for Register {
 impl<const R: usize, const S: usize> Read<R, S> for Address {
     fn read(&self, memory: &Memory<R, S>) -> msize {
         let address = match self {
-            literal @ Address::IntLiteral(..) => literal.read(memory),
+            Address::IntLiteral(literal) => literal.read(memory),
             Address::Register(register) => register.read(memory),
         };
         memory.ram[address as usize]
@@ -238,7 +238,7 @@ impl<const R: usize, const S: usize> Write<R, S> for Register {
 impl<const R: usize, const S: usize> Write<R, S> for Address {
     fn write(&self, memory: &mut Memory<R, S>, value: msize) {
         let address = match self {
-            literal @ Address::IntLiteral(..) => literal.read(memory),
+            Address::IntLiteral(literal) => literal.read(memory),
             Address::Register(register) => register.read(memory),
         };
         memory.ram[address as usize] = value;

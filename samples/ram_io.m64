@@ -1,0 +1,4 @@
+; RAM I/O test
+
+mov *666, 777
+out *666
